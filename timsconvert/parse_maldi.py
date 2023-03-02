@@ -2,6 +2,7 @@ from timsconvert.constants import *
 import numpy as np
 import pandas as pd
 import logging
+import itertools
 
 
 # Parse MALDI plate map from CSV file.
@@ -44,6 +45,25 @@ def extract_maldi_tsf_spectrum_arrays(tsf_data, mode, frame, profile_bins, encod
 
 # Get either raw (slightly modified implementation that gets centroid spectrum), quasi-profile, or centroid spectrum.
 # Returns an m/z array and intensity array.
+def extract_maldi_tdf_spectrum_arrays_with_mobility(tdf_data, mode, multiscan, frame, scan_begin, scan_end, profile_bins, encoding):
+    list_idx_val = tdf_data.read_scans(frame, scan_begin, scan_end)
+    non_empty_scans = []
+    npeak_scans     = []
+    all_index       = []
+    all_intensity   = []
+    for s, (idx, val) in enumerate(list_idx_val):
+        if len(idx) >0:
+            non_empty_scans.append(s)
+            npeak_scans.append(len(idx))
+            all_index.append(idx)
+            all_intensity.append(val)
+
+    all_mz    = tdf_data.index_to_mz(frame, np.concatenate(all_index))
+    mobility_scans = tdf_data.scan_num_to_oneoverk0(frame, np.array(non_empty_scans))
+    all_mobility = np.concatenate([np.repeat(mob, peaks) for mob,peaks in zip(mobility_scans.tolist(), npeak_scans)])
+    all_intensity = np.concatenate(all_intensity)
+    return all_mz,all_intensity,all_mobility
+
 def extract_maldi_tdf_spectrum_arrays(tdf_data, mode, multiscan, frame, scan_begin, scan_end, profile_bins, encoding):
     if encoding == 32:
         encoding_dtype = np.float32
@@ -216,50 +236,38 @@ def parse_maldi_tdf(tdf_data, frame_start, frame_stop, mode, ms2_only, exclude_m
         if int(frames_dict['MsMsType']) in MSMS_TYPE_CATEGORY['ms1']:
             if ms2_only == False:
                 if exclude_mobility == False:
-                    frame_mz_arrays = []
-                    frame_intensity_arrays = []
-                    frame_mobility_arrays = []
-                    for scan_num in range(0, int(frames_dict['NumScans'])):
-                        mz_array, intensity_array = extract_maldi_tdf_spectrum_arrays(tdf_data,
-                                                                                      mode,
-                                                                                      True,
-                                                                                      frame,
-                                                                                      scan_num,
-                                                                                      scan_num + 1,
-                                                                                      profile_bins,
-                                                                                      encoding)
-                        if mz_array.size != 0 and intensity_array.size != 0 and mz_array.size == intensity_array.size:
-                            mobility = tdf_data.scan_num_to_oneoverk0(frame, np.array([scan_num]))[0]
-                            mobility_array = np.repeat(mobility, mz_array.size)
+                    frame_mz_arrays,frame_intensity_arrays, frame_mobility_arrays = extract_maldi_tdf_spectrum_arrays_with_mobility(
+                    tdf_data,
+                    mode,
+                    True,
+                    frame,
+                    0,
+                    int(frames_dict['NumScans']),
+                    profile_bins,
+                    encoding
+                    )
+                    frames_array = np.stack([frame_mz_arrays,frame_intensity_arrays, frame_mobility_arrays], axis=-1)
+                    frames_array = np.unique(frames_array[np.argsort(frames_array[:, 0])], axis=0)
 
-                            frame_mz_arrays.append(mz_array)
-                            frame_intensity_arrays.append(intensity_array)
-                            frame_mobility_arrays.append(mobility_array)
-                    if frame_mz_arrays and frame_intensity_arrays and frame_mobility_arrays:
-                        frames_array = np.stack((np.concatenate(frame_mz_arrays, axis=None),
-                                                 np.concatenate(frame_intensity_arrays, axis=None),
-                                                 np.concatenate(frame_mobility_arrays, axis=None)),
-                                                axis=-1)
-                        frames_array = np.unique(frames_array[np.argsort(frames_array[:, 0])], axis=0)
-                        base_peak_index = np.where(frames_array[:, 1] == np.max(frames_array[:, 1]))
-                        scan_dict = {'scan_number': None,
-                                     'scan_type': 'MS1 spectrum',
-                                     'ms_level': 1,
-                                     'mz_array': frames_array[:, 0],
-                                     'intensity_array': frames_array[:, 1],
-                                     'mobility': None,
-                                     'mobility_array': frames_array[:, 2],
-                                     'coord': coords,
-                                     'polarity': frames_dict['Polarity'],
-                                     'centroided': centroided,
-                                     'retention_time': 0,
-                                     'total_ion_current': sum(frames_array[:, 1]),
-                                     'base_peak_mz': frames_array[:, 0][base_peak_index][0].astype(float),
-                                     'base_peak_intensity': frames_array[:, 1][base_peak_index][0].astype(float),
-                                     'high_mz': float(max(frames_array[:, 0])),
-                                     'low_mz': float(min(frames_array[:, 0])),
-                                     'frame': frame}
-                        list_of_scan_dicts.append(scan_dict)
+                    base_peak_index = np.where(frames_array[:, 1] == np.max(frames_array[:, 1]))
+                    scan_dict = {'scan_number': None,
+                                    'scan_type': 'MS1 spectrum',
+                                    'ms_level': 1,
+                                    'mz_array': frames_array[:, 0],
+                                    'intensity_array': frames_array[:, 1],
+                                    'mobility': None,
+                                    'mobility_array': frames_array[:, 2],
+                                    'coord': coords,
+                                    'polarity': frames_dict['Polarity'],
+                                    'centroided': centroided,
+                                    'retention_time': 0,
+                                    'total_ion_current': sum(frames_array[:, 1]),
+                                    'base_peak_mz': frames_array[:, 0][base_peak_index][0].astype(float),
+                                    'base_peak_intensity': frames_array[:, 1][base_peak_index][0].astype(float),
+                                    'high_mz': float(max(frames_array[:, 0])),
+                                    'low_mz': float(min(frames_array[:, 0])),
+                                    'frame': frame}
+                    list_of_scan_dicts.append(scan_dict)
                 elif exclude_mobility == True:
                     mz_array, intensity_array = extract_maldi_tdf_spectrum_arrays(tdf_data,
                                                                                   mode,
