@@ -57,12 +57,15 @@ def extract_maldi_tdf_spectrum_arrays_with_mobility(tdf_data, mode, multiscan, f
             npeak_scans.append(len(idx))
             all_index.append(idx)
             all_intensity.append(val)
-
-    all_mz    = tdf_data.index_to_mz(frame, np.concatenate(all_index))
-    mobility_scans = tdf_data.scan_num_to_oneoverk0(frame, np.array(non_empty_scans))
-    all_mobility = np.concatenate([np.repeat(mob, peaks) for mob,peaks in zip(mobility_scans.tolist(), npeak_scans)])
+    charge        = 1
+    all_mz        = tdf_data.index_to_mz(frame, np.concatenate(all_index))
+    ook0_scans    = tdf_data.scan_num_to_oneoverk0(frame, np.array(non_empty_scans))
+    all_mobility  = np.concatenate([np.repeat(mob, npeaks) 
+                                     for mob,npeaks in zip(ook0_scans.tolist(), npeak_scans)])
+    all_ccs       = np.array([tdf_data.oneOverK0ToCCSforMz(ook0, charge, mz) 
+                               for mz,ook0 in zip(all_mz.tolist(), all_mobility.tolist())])
     all_intensity = np.concatenate(all_intensity)
-    return all_mz,all_intensity,all_mobility
+    return all_mz, all_intensity, all_ccs
 
 def extract_maldi_tdf_spectrum_arrays(tdf_data, mode, multiscan, frame, scan_begin, scan_end, profile_bins, encoding):
     if encoding == 32:
@@ -237,15 +240,15 @@ def parse_maldi_tdf(tdf_data, frame_start, frame_stop, mode, ms2_only, exclude_m
             if ms2_only == False:
                 if exclude_mobility == False:
                     frame_mz_arrays,frame_intensity_arrays, frame_mobility_arrays = extract_maldi_tdf_spectrum_arrays_with_mobility(
-                    tdf_data,
-                    mode,
-                    True,
-                    frame,
-                    0,
-                    int(frames_dict['NumScans']),
-                    profile_bins,
-                    encoding
-                    )
+                                tdf_data,
+                                mode,
+                                True,
+                                frame,
+                                0,
+                                int(frames_dict['NumScans']),
+                                profile_bins,
+                                encoding
+                                )
                     frames_array = np.stack([frame_mz_arrays,frame_intensity_arrays, frame_mobility_arrays], axis=-1)
                     frames_array = np.unique(frames_array[np.argsort(frames_array[:, 0])], axis=0)
 

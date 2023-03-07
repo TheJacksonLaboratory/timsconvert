@@ -332,6 +332,9 @@ class tdf_data(object):
     def scan_num_to_oneoverk0(self, frame_id, scan_nums):
         return self.__call_conversion_func(frame_id, scan_nums, self.dll.tims_scannum_to_oneoverk0)
 
+    def oneOverK0ToCCSforMz(self, ook0, charge, mz):
+        return self.dll.tims_oneoverk0_to_ccs_for_mz(ook0, charge, mz)
+
     # modified from Bruker timsdata.py
     def read_scans(self, frame_id, scan_begin, scan_end):
         while True:
