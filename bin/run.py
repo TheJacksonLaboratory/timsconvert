@@ -1,7 +1,6 @@
 from timsconvert import *
 from tdf2mzml import *
 
-
 def run_timsconvert(args):
     # Args check.
     args_check(args)
@@ -83,7 +82,7 @@ def run_timsconvert(args):
                 logging.info(get_timestamp() + ':' + 'Processing MALDI imaging mass spectrometry data...')
                 write_maldi_ims_imzml(data, run_args['outdir'], run_args['outfile'], run_args['mode'],
                                       run_args['exclude_mobility'], run_args['profile_bins'], run_args['imzml_mode'],
-                                      run_args['encoding'], run_args['compression'], run_args['chunk_size'])
+                                      run_args['encoding'], run_args['compression'], run_args['chunk_size'],run_args['mobility_decimals'])
         elif schema == 'TDF':
             logging.info(get_timestamp() + ':' + '.tdf file detected...')
             if 'MaldiApplicationType' in data.meta_data.keys():
@@ -103,7 +102,7 @@ def run_timsconvert(args):
                     write_maldi_ims_imzml(data, run_args['outdir'], run_args['outfile'], run_args['mode'],
                                           run_args['exclude_mobility'], run_args['profile_bins'],
                                           run_args['imzml_mode'], run_args['encoding'], run_args['compression'],
-                                          run_args['chunk_size'])
+                                          run_args['chunk_size'], run_args['mobility_decimals'])
             elif 'MaldiApplicationType' not in data.meta_data.keys():
                 if run_args['outfile'] == '':
                     run_args['outfile'] = os.path.splitext(os.path.split(infile)[-1])[0] + '.mzML'

@@ -46,6 +46,10 @@ def extract_maldi_tsf_spectrum_arrays(tsf_data, mode, frame, profile_bins, encod
 # Get either raw (slightly modified implementation that gets centroid spectrum), quasi-profile, or centroid spectrum.
 # Returns an m/z array and intensity array.
 def extract_maldi_tdf_spectrum_arrays_with_mobility(tdf_data, mode, multiscan, frame, scan_begin, scan_end, profile_bins, encoding):
+    if encoding == 32:
+        encoding_dtype = np.float32
+    elif encoding == 64:
+        encoding_dtype = np.float64
     list_idx_val = tdf_data.read_scans(frame, scan_begin, scan_end)
     non_empty_scans = []
     npeak_scans     = []
@@ -56,15 +60,16 @@ def extract_maldi_tdf_spectrum_arrays_with_mobility(tdf_data, mode, multiscan, f
             non_empty_scans.append(s)
             npeak_scans.append(len(idx))
             all_index.append(idx)
-            all_intensity.append(val)
+            all_intensity.append(val.astype(encoding_dtype))
     charge        = 1
-    all_mz        = tdf_data.index_to_mz(frame, np.concatenate(all_index))
+    all_mz        = tdf_data.index_to_mz(frame, np.concatenate(all_index)).astype(encoding_dtype)
     ook0_scans    = tdf_data.scan_num_to_oneoverk0(frame, np.array(non_empty_scans))
     all_mobility  = np.concatenate([np.repeat(mob, npeaks) 
                                      for mob,npeaks in zip(ook0_scans.tolist(), npeak_scans)])
     all_ccs       = np.array([tdf_data.oneOverK0ToCCSforMz(ook0, charge, mz) 
-                               for mz,ook0 in zip(all_mz.tolist(), all_mobility.tolist())])
+                               for mz,ook0 in zip(all_mz.tolist(), all_mobility.tolist())], dtype=encoding_dtype)
     all_intensity = np.concatenate(all_intensity)
+
     return all_mz, all_intensity, all_ccs
 
 def extract_maldi_tdf_spectrum_arrays(tdf_data, mode, multiscan, frame, scan_begin, scan_end, profile_bins, encoding):

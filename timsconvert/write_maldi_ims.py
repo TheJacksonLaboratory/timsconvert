@@ -5,6 +5,7 @@ from functools import partial
 import itertools
 import multiprocessing
 from multiprocessing.pool import ThreadPool as Pool
+import numpy as np
 
 def read_maldi_ims_chunk(data, frame_start, frame_stop, mode, exclude_mobility, profile_bins,
                                    encoding):
@@ -17,7 +18,7 @@ def read_maldi_ims_chunk(data, frame_start, frame_stop, mode, exclude_mobility, 
     return list_of_scan_dicts
 
 def write_maldi_ims_chunk_to_imzml1(data, imzml_file, frame_start, frame_stop, mode, exclude_mobility, profile_bins,
-                                   encoding, list_of_scan_dicts):
+                                   encoding, list_of_scan_dicts, rounding=1):
     if data.meta_data['SchemaType'] == 'TSF':
         for scan_dict in list_of_scan_dicts:
             imzml_file.addSpectrum(scan_dict['mz_array'],
@@ -26,12 +27,14 @@ def write_maldi_ims_chunk_to_imzml1(data, imzml_file, frame_start, frame_stop, m
     elif data.meta_data['SchemaType'] == 'TDF':
         if mode == 'profile':
             exclude_mobility = True
+        assert rounding >=0, 'mobility_round bits must >= 0'
         if exclude_mobility == False:
-            for scan_dict in list_of_scan_dicts:
+             for scan_dict in list_of_scan_dicts:
+                all_mobilities = np.round(scan_dict['mobility_array'], decimals=rounding) * 100000 + scan_dict['mz_array']
                 imzml_file.addSpectrum(scan_dict['mz_array'],
                                        scan_dict['intensity_array'],
                                        scan_dict['coord'],
-                                       mobilities=scan_dict['mobility_array'])
+                                       mobilities= all_mobilities)
         elif exclude_mobility == True:
             for scan_dict in list_of_scan_dicts:
                 imzml_file.addSpectrum(scan_dict['mz_array'],
@@ -69,7 +72,7 @@ def write_maldi_ims_chunk_to_imzml(data, imzml_file, frame_start, frame_stop, mo
 
 
 def write_maldi_ims_imzml(data, outdir, outfile, mode, exclude_mobility, profile_bins, imzml_mode, encoding,
-                          compression, chunk_size):
+                          compression, chunk_size, rounding = 1):
     # Set polarity for run in imzML.
     polarity = list(set(data.frames['Polarity'].values.tolist()))
     if len(polarity) == 1:
@@ -167,7 +170,7 @@ def write_maldi_ims_imzml(data, outdir, outfile, mode, exclude_mobility, profile
             #     res = pool.starmap(func, chunk_list)
             # list_scan = list(itertools.chain.from_iterable(res))
             write_maldi_ims_chunk_to_imzml1(data, imzml_file, frame_start, frame_stop, mode, exclude_mobility,
-                                                profile_bins, encoding, list_scan)
+                                                profile_bins, encoding, list_scan, rounding = rounding)
             chunk += chunk_size
         else:
             chunk_list = []

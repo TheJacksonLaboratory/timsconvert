@@ -97,6 +97,7 @@ def get_args(server=False):
     tdf2mzml_args.add_argument('--ms1_threshold', help=desc['ms1_threshold'], default=100, type=float)
     tdf2mzml_args.add_argument('--ms2_threshold', help=desc['ms2_threshold'], default=10, type=float)
     tdf2mzml_args.add_argument('--ms2_nlargest', help=desc['ms2_nlargest'], default=-1, type=int)
+    tdf2mzml_args.add_argument('--mobility_decimals', default=1,type=int)
 
     # Return parser
     arguments = parser.parse_args()
